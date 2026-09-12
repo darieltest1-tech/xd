@@ -1,10 +1,9 @@
-
 //Require standard library
 #import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
 #import <Foundation/Foundation.h>
 #include <iostream>
-#include <UIKit/UIKit.h>
+#import <UIKit/UIKit.h>
 #include <vector>
 #import "pthread.h"
 #include <array>
@@ -115,17 +114,19 @@ NSString* getRealDeviceName() {
     } \
 }
 
-
-
 #define kWidth  [UIScreen mainScreen].bounds.size.width
 #define kHeight [UIScreen mainScreen].bounds.size.height
 #define kScale [UIScreen mainScreen].scale
+
+// Variables for custom color picker section
+static ImVec4 menuColorPrimary = ImVec4(0.40f, 0.30f, 0.60f, 0.8f);
+static ImVec4 menuColorWindowBg = ImVec4(0.35f, 0.25f, 0.50f, 0.50f);
+static ImVec4 menuColorText = ImVec4(0.95f, 0.90f, 1.00f, 1.0f);
 
 @interface ImGuiDrawView () <MTKViewDelegate>
 @property (nonatomic, strong) id <MTLDevice> device;
 @property (nonatomic, strong) id <MTLCommandQueue> commandQueue;
 @end
-
 
 @implementation ImGuiDrawView
 ImFont *_espFont;
@@ -173,6 +174,22 @@ static int frameCounter = 0;
     [defaults setBool:spin360 forKey:@"spin360"];
     [defaults setFloat:SpinSpeed forKey:@"SpinSpeed"];
     
+    // Lưu màu sắc tùy chỉnh
+    [defaults setFloat:menuColorPrimary.x forKey:@"ColorPrimary_R"];
+    [defaults setFloat:menuColorPrimary.y forKey:@"ColorPrimary_G"];
+    [defaults setFloat:menuColorPrimary.z forKey:@"ColorPrimary_B"];
+    [defaults setFloat:menuColorPrimary.w forKey:@"ColorPrimary_A"];
+
+    [defaults setFloat:menuColorWindowBg.x forKey:@"ColorWindow_R"];
+    [defaults setFloat:menuColorWindowBg.y forKey:@"ColorWindow_G"];
+    [defaults setFloat:menuColorWindowBg.z forKey:@"ColorWindow_B"];
+    [defaults setFloat:menuColorWindowBg.w forKey:@"ColorWindow_A"];
+
+    [defaults setFloat:menuColorText.x forKey:@"ColorText_R"];
+    [defaults setFloat:menuColorText.y forKey:@"ColorText_G"];
+    [defaults setFloat:menuColorText.z forKey:@"ColorText_B"];
+    [defaults setFloat:menuColorText.w forKey:@"ColorText_A"];
+
     // Lưu ngôn ngữ
     [defaults setInteger:currentLang forKey:@"currentLang"];
     
@@ -212,6 +229,26 @@ static int frameCounter = 0;
     spin360 = [defaults boolForKey:@"spin360"];
     SpinSpeed = [defaults floatForKey:@"SpinSpeed"];
     
+    // Tải màu sắc nếu đã được lưu trước đó
+    if ([defaults objectForKey:@"ColorPrimary_R"]) {
+        menuColorPrimary.x = [defaults floatForKey:@"ColorPrimary_R"];
+        menuColorPrimary.y = [defaults floatForKey:@"ColorPrimary_G"];
+        menuColorPrimary.z = [defaults floatForKey:@"ColorPrimary_B"];
+        menuColorPrimary.w = [defaults floatForKey:@"ColorPrimary_A"];
+    }
+    if ([defaults objectForKey:@"ColorWindow_R"]) {
+        menuColorWindowBg.x = [defaults floatForKey:@"ColorWindow_R"];
+        menuColorWindowBg.y = [defaults floatForKey:@"ColorWindow_G"];
+        menuColorWindowBg.z = [defaults floatForKey:@"ColorWindow_B"];
+        menuColorWindowBg.w = [defaults floatForKey:@"ColorWindow_A"];
+    }
+    if ([defaults objectForKey:@"ColorText_R"]) {
+        menuColorText.x = [defaults floatForKey:@"ColorText_R"];
+        menuColorText.y = [defaults floatForKey:@"ColorText_G"];
+        menuColorText.z = [defaults floatForKey:@"ColorText_B"];
+        menuColorText.w = [defaults floatForKey:@"ColorText_A"];
+    }
+
     // Tải ngôn ngữ
     currentLang = (int)[defaults integerForKey:@"currentLang"];
 }
@@ -231,82 +268,17 @@ static int frameCounter = 0;
     ImGuiIO& io = ImGui::GetIO(); (void)io;
 
     ImGui::StyleColorsClassic();
-auto& Style = ImGui::GetStyle();
-
-// --- Cấu trúc khung Menu ---
-Style.WindowPadding     = ImVec2(12.0f, 12.0f);
-Style.WindowTitleAlign  = ImVec2(0.5f, 0.5f);
-Style.FramePadding      = ImVec2(8.0f, 8.0f);
-Style.ScrollbarRounding = 12.0f;
-Style.WindowRounding    = 18.0f;
-Style.FrameRounding     = 9.0f;
-Style.ChildRounding     = 14.0f;
-Style.GrabRounding      = 8.0f;
-Style.WindowBorderSize  = 1.2f;
-Style.ChildBorderSize   = 1.0f;
-Style.PopupBorderSize   = 1.0f;
-Style.FrameBorderSize   = 0.8f;
-
-// --- Bảng màu TÍM NHẸ + TRONG SUỐT ---
-ImVec4* colors = Style.Colors;
-
-// Nền tím nhạt trong suốt
-colors[ImGuiCol_WindowBg]             = ImVec4(0.35f, 0.25f, 0.50f, 0.50f); 
-colors[ImGuiCol_ChildBg]              = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-colors[ImGuiCol_PopupBg]              = ImVec4(0.15f, 0.10f, 0.20f, 0.90f);
-
-// Viền tím mờ
-colors[ImGuiCol_Border]               = ImVec4(0.60f, 0.50f, 0.80f, 0.50f);
-
-// CHỮ TRẮNG (Dễ nhìn hơn trên nền tím)
-colors[ImGuiCol_Text]                 = ImVec4(0.95f, 0.90f, 1.00f, 1.0f);
-colors[ImGuiCol_TextDisabled]         = ImVec4(0.70f, 0.70f, 0.80f, 0.5f);
-
-// Nền tiêu đề tím trong suốt
-colors[ImGuiCol_TitleBg]              = ImVec4(0.30f, 0.20f, 0.45f, 0.7f);
-colors[ImGuiCol_TitleBgActive]        = ImVec4(0.40f, 0.30f, 0.60f, 0.8f);
-colors[ImGuiCol_TitleBgCollapsed]     = ImVec4(0.20f, 0.15f, 0.30f, 0.5f);
-
-// ===== CÁC THÀNH PHẦN KHÁC TÔNG TÍM =====
-colors[ImGuiCol_CheckMark]            = ImVec4(0.80f, 0.70f, 1.00f, 1.0f);   // Checkmark tím sáng
-
-colors[ImGuiCol_SliderGrab]           = ImVec4(0.60f, 0.50f, 0.80f, 0.7f);   // Slider tím mờ
-colors[ImGuiCol_SliderGrabActive]     = ImVec4(0.80f, 0.70f, 1.00f, 1.0f);
-colors[ImGuiCol_ScrollbarBg]          = ImVec4(0.1f, 0.1f, 0.15f, 0.3f);
-colors[ImGuiCol_ScrollbarGrab]        = ImVec4(0.4f, 0.3f, 0.6f, 0.4f);
-colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.5f, 0.4f, 0.7f, 0.5f);
-colors[ImGuiCol_ScrollbarGrabActive]  = ImVec4(0.6f, 0.5f, 0.8f, 0.6f);
-
-colors[ImGuiCol_Button]               = ImVec4(0.40f, 0.30f, 0.60f, 0.4f);
-colors[ImGuiCol_ButtonHovered]        = ImVec4(0.50f, 0.40f, 0.75f, 0.6f);
-colors[ImGuiCol_ButtonActive]         = ImVec4(0.60f, 0.50f, 0.90f, 0.8f);
-
-colors[ImGuiCol_Header]               = ImVec4(0.40f, 0.30f, 0.60f, 0.4f);
-colors[ImGuiCol_HeaderHovered]        = ImVec4(0.50f, 0.40f, 0.75f, 0.6f);
-colors[ImGuiCol_HeaderActive]         = ImVec4(0.60f, 0.50f, 0.90f, 0.8f);
-colors[ImGuiCol_Tab]                  = ImVec4(0.20f, 0.15f, 0.30f, 0.4f);
-colors[ImGuiCol_TabHovered]           = ImVec4(0.50f, 0.40f, 0.75f, 0.6f);
-colors[ImGuiCol_TabActive]            = ImVec4(0.40f, 0.30f, 0.60f, 0.8f);
-
-colors[ImGuiCol_FrameBg]              = ImVec4(0.20f, 0.15f, 0.30f, 0.4f);
-colors[ImGuiCol_FrameBgHovered]       = ImVec4(0.30f, 0.25f, 0.45f, 0.6f);
-colors[ImGuiCol_FrameBgActive]        = ImVec4(0.40f, 0.35f, 0.60f, 0.8f);
-
-colors[ImGuiCol_ResizeGrip]           = ImVec4(0.60f, 0.50f, 0.80f, 0.4f);
-colors[ImGuiCol_ResizeGripHovered]    = ImVec4(0.70f, 0.60f, 0.90f, 0.6f);
-colors[ImGuiCol_ResizeGripActive]     = ImVec4(0.80f, 0.70f, 1.00f, 0.8f);
-colors[ImGuiCol_NavHighlight]         = ImVec4(0.80f, 0.70f, 1.00f, 0.8f);
-
-// --- Load Font ---
-io.Fonts->AddFontFromMemoryTTF(sansbold, sizeof(sansbold), 15.0f, NULL, io.Fonts->GetGlyphRangesCyrillic());
-verdana_smol = io.Fonts->AddFontFromMemoryTTF(verdana, sizeof verdana, 40, NULL, io.Fonts->GetGlyphRangesCyrillic());
-pixel_big = io.Fonts->AddFontFromMemoryTTF((void*)smallestpixel, sizeof smallestpixel, 128, NULL, io.Fonts->GetGlyphRangesCyrillic());
-pixel_smol = io.Fonts->AddFontFromMemoryTTF((void*)smallestpixel, sizeof smallestpixel, 10*2, NULL, io.Fonts->GetGlyphRangesCyrillic());
-
-ImGui_ImplMetal_Init(_device);
-
+    
     // ===== LOAD CÀI ĐẶT ĐÃ LƯU KHI KHỞI ĐỘNG =====
     [self loadSettings];
+
+    // --- Load Font ---
+    io.Fonts->AddFontFromMemoryTTF(sansbold, sizeof(sansbold), 15.0f, NULL, io.Fonts->GetGlyphRangesCyrillic());
+    verdana_smol = io.Fonts->AddFontFromMemoryTTF(verdana, sizeof verdana, 40, NULL, io.Fonts->GetGlyphRangesCyrillic());
+    pixel_big = io.Fonts->AddFontFromMemoryTTF((void*)smallestpixel, sizeof smallestpixel, 128, NULL, io.Fonts->GetGlyphRangesCyrillic());
+    pixel_smol = io.Fonts->AddFontFromMemoryTTF((void*)smallestpixel, sizeof smallestpixel, 10*2, NULL, io.Fonts->GetGlyphRangesCyrillic());
+
+    ImGui_ImplMetal_Init(_device);
     
     return self;
 }
@@ -393,6 +365,57 @@ ImGui_ImplMetal_Init(_device);
     io.DisplayFramebufferScale = ImVec2(framebufferScale, framebufferScale);
     io.DeltaTime = 1 / float(view.preferredFramesPerSecond ?: 60);
     
+    // --- Cập nhật style màu sắc động theo biến được chọn ---
+    auto& Style = ImGui::GetStyle();
+    Style.WindowPadding     = ImVec2(12.0f, 12.0f);
+    Style.WindowTitleAlign  = ImVec2(0.5f, 0.5f);
+    Style.FramePadding      = ImVec2(8.0f, 8.0f);
+    Style.ScrollbarRounding = 12.0f;
+    Style.WindowRounding    = 18.0f;
+    Style.FrameRounding     = 9.0f;
+    Style.ChildRounding     = 14.0f;
+    Style.GrabRounding      = 8.0f;
+    Style.WindowBorderSize  = 1.2f;
+    Style.ChildBorderSize   = 1.0f;
+    Style.PopupBorderSize   = 1.0f;
+    Style.FrameBorderSize   = 0.8f;
+
+    ImVec4* colors = Style.Colors;
+    colors[ImGuiCol_WindowBg]             = menuColorWindowBg; 
+    colors[ImGuiCol_ChildBg]              = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+    colors[ImGuiCol_PopupBg]              = ImVec4(0.15f, 0.10f, 0.20f, 0.90f);
+    colors[ImGuiCol_Border]               = ImVec4(menuColorPrimary.x, menuColorPrimary.y, menuColorPrimary.z, 0.5f);
+
+    colors[ImGuiCol_Text]                 = menuColorText;
+    colors[ImGuiCol_TextDisabled]         = ImVec4(0.70f, 0.70f, 0.80f, 0.5f);
+
+    colors[ImGuiCol_TitleBg]              = ImVec4(menuColorPrimary.x * 0.8f, menuColorPrimary.y * 0.8f, menuColorPrimary.z * 0.8f, 0.7f);
+    colors[ImGuiCol_TitleBgActive]        = menuColorPrimary;
+    colors[ImGuiCol_TitleBgCollapsed]     = ImVec4(0.20f, 0.15f, 0.30f, 0.5f);
+
+    colors[ImGuiCol_CheckMark]            = menuColorPrimary;
+    colors[ImGuiCol_SliderGrab]           = menuColorPrimary;
+    colors[ImGuiCol_SliderGrabActive]     = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+    colors[ImGuiCol_ScrollbarBg]          = ImVec4(0.1f, 0.1f, 0.15f, 0.3f);
+    colors[ImGuiCol_ScrollbarGrab]        = menuColorPrimary;
+    colors[ImGuiCol_ScrollbarGrabHovered] = menuColorPrimary;
+    colors[ImGuiCol_ScrollbarGrabActive]  = menuColorPrimary;
+
+    colors[ImGuiCol_Button]               = menuColorPrimary;
+    colors[ImGuiCol_ButtonHovered]        = ImVec4(menuColorPrimary.x * 1.2f, menuColorPrimary.y * 1.2f, menuColorPrimary.z * 1.2f, 0.8f);
+    colors[ImGuiCol_ButtonActive]         = ImVec4(menuColorPrimary.x * 1.4f, menuColorPrimary.y * 1.4f, menuColorPrimary.z * 1.4f, 1.0f);
+
+    colors[ImGuiCol_Header]               = menuColorPrimary;
+    colors[ImGuiCol_HeaderHovered]        = ImVec4(menuColorPrimary.x * 1.2f, menuColorPrimary.y * 1.2f, menuColorPrimary.z * 1.2f, 0.8f);
+    colors[ImGuiCol_HeaderActive]         = menuColorPrimary;
+    colors[ImGuiCol_Tab]                  = ImVec4(menuColorPrimary.x * 0.6f, menuColorPrimary.y * 0.6f, menuColorPrimary.z * 0.6f, 0.4f);
+    colors[ImGuiCol_TabHovered]           = menuColorPrimary;
+    colors[ImGuiCol_TabActive]            = menuColorPrimary;
+
+    colors[ImGuiCol_FrameBg]              = ImVec4(0.20f, 0.15f, 0.30f, 0.4f);
+    colors[ImGuiCol_FrameBgHovered]       = ImVec4(0.30f, 0.25f, 0.45f, 0.6f);
+    colors[ImGuiCol_FrameBgActive]        = menuColorPrimary;
+
     id<MTLCommandBuffer> commandBuffer = [self.commandQueue commandBuffer];
     
     frameCounter++;
@@ -438,7 +461,7 @@ ImGui_ImplMetal_Init(_device);
             ImGui::SetNextWindowSize(ImVec2(baseWidth * scale, baseHeight * scale), ImGuiCond_Always);
 
             ImGui::PushStyleVar(ImGuiStyleVar_WindowTitleAlign, ImVec2(0.5f, 0.5f));                
-            ImGui::Begin(oxorany("Telegram: @Gbaovnxios"), &MenDeal, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+            ImGui::Begin(oxorany("darielxit7 - Mod Menu"), &MenDeal, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
             
             if (ImGui::BeginTabBar(oxorany("Tab"), ImGuiTabBarFlags_FittingPolicyScroll)) {
                 
@@ -446,8 +469,8 @@ ImGui_ImplMetal_Init(_device);
 if (ImGui::BeginTabItem("Main")) {
     ImGui::Spacing();
     
-    // ===== DÒNG ADMIN MÀU HỒNG ĐẬM =====
-    ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.6f, 1.0f), oxorany("Project Administrator Creates Telegram @Gbaovnxios ^^"));
+    // ===== DÒNG ADMIN ĐỔI THÀNH DARIELXIT7 =====
+    ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.6f, 1.0f), oxorany("darielxit7 Free Fire Mod Menu Active ^^"));
     ImGui::Spacing();
     
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(7.0f, 7.0f));
@@ -545,26 +568,44 @@ if (ImGui::BeginTabItem("Main")) {
     ImGui::EndTabItem();
 }
 
-                // --- Tab EXTRA ---
-                if (ImGui::BeginTabItem("Extra")) {
-                    ImGui::Spacing();
+// --- Tab EXTRA ---
+if (ImGui::BeginTabItem("Extra")) {
+    ImGui::Spacing();
 
-                    if (currentLang == 0) {
-                        ImGui::Checkbox("Speed Spin Bot", &spin360);
-                    } else {
-                        ImGui::Checkbox("Quay Nhanh", &spin360);
-                    }
+    if (currentLang == 0) {
+        ImGui::Checkbox("Speed Spin Bot", &spin360);
+    } else {
+        ImGui::Checkbox("Quay Nhanh", &spin360);
+    }
 
-                    if (spin360) {
-                        if (currentLang == 0) {
-                            ImGui::SliderFloat("Speed Spin", &SpinSpeed, 0.0f, 30000.0f, "%.0f");
-                        } else {
-                            ImGui::SliderFloat("Toc Do Quay", &SpinSpeed, 0.0f, 30000.0f, "%.0f");
-                        }
-                    }
+    if (spin360) {
+        if (currentLang == 0) {
+            ImGui::SliderFloat("Speed Spin", &SpinSpeed, 0.0f, 30000.0f, "%.0f");
+        } else {
+            ImGui::SliderFloat("Toc Do Quay", &SpinSpeed, 0.0f, 30000.0f, "%.0f");
+        }
+    }
 
-                    ImGui::EndTabItem();
-                }
+    ImGui::EndTabItem();
+}
+
+// --- Tab COLORS (MỚI: TÙY CHỈNH MÀU SẮC) ---
+if (ImGui::BeginTabItem("Colors")) {
+    ImGui::Spacing();
+    ImGui::TextColored(ImVec4(0.3f, 0.7f, 1.0f, 1.0f), oxorany("Menu Color Customization"));
+    ImGui::Spacing();
+
+    ImGui::ColorEdit4("Primary Color", (float*)&menuColorPrimary);
+    ImGui::ColorEdit4("Window Background", (float*)&menuColorWindowBg);
+    ImGui::ColorEdit4("Text Color", (float*)&menuColorText);
+
+    ImGui::Spacing();
+    if (ImGui::Button("Save Colors", ImVec2(120, 35))) {
+        [self saveSettings];
+    }
+
+    ImGui::EndTabItem();
+}
 
 // --- Tab Settings ---
 if (ImGui::BeginTabItem("Settings")) {
@@ -575,13 +616,13 @@ if (ImGui::BeginTabItem("Settings")) {
     ImGui::Text("Name: %s", [[UIDevice currentDevice].name UTF8String]);
     ImGui::Text("Version Game: 1.123.1");
     ImGui::Text("Build Menu Version: 1.5.5");
-    ImGui::TextColored(ImVec4(0.3f, 0.7f, 1.0f, 1.0f), oxorany("Owner: @Gbaovnxios"));;
+    ImGui::TextColored(ImVec4(0.3f, 0.7f, 1.0f, 1.0f), oxorany("Owner: darielxit7"));
     
     if (ImGui::Button("Channel")) {
         [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://t.me/hachfreefirevnios"]];
     }
     if (ImGui::Button("Admin")) {
-        [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://t.me/Giabaovnios"]];
+        [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://t.me/darielxit7"]];
     }
     
     ImGui::Spacing();
@@ -594,7 +635,7 @@ if (ImGui::BeginTabItem("Settings")) {
     ImGui::Spacing();
     ImGui::Separator();
     
-     ImGui::TextColored(ImVec4(0.3f, 0.7f, 1.0f, 1.0f), oxorany("LANGUAGE / NGON NGU"));;
+    ImGui::TextColored(ImVec4(0.3f, 0.7f, 1.0f, 1.0f), oxorany("LANGUAGE / NGON NGU"));
     
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 0));
     
