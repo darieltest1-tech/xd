@@ -20,8 +20,24 @@ jobs:
       - name: Find and Prepare dylib
         run: |
           mkdir -p extracted_dylib
-          # Busca el archivo .dylib dentro de la carpeta .theos uobj o paquetes y lo copia
-          find . -name "*.dylib" -exec cp {} extracted_dylib/ \;
+          
+          # Opción A: Buscar dentro de obj/ o .theos/obj/ que es donde Theos compila TU tweak específicamente
+          # (Excluyendo cualquier otra carpeta externa o de herramientas de swift/clang)
+          find obj/ -name "*.dylib" -maxdepth 2 -exec cp {} extracted_dylib/ 2>/dev/null || true
+          
+          # Por si acaso se genera directamente en la raíz o en .theos/
+          if [ -z "$(ls -A extracted_dylib)" ]; then
+            find . -name "*.dylib" ! -path "*/.theos/obj/host/*" ! -path "*/swift/*" ! -path "*/libclang*" ! -name "lib_Internal*" ! -name "lib_Swift*" -exec cp {} extracted_dylib/ \;
+          fi
+
+          # Limpieza de seguridad por si acaso se filtró alguno no deseado
+          rm -f extracted_dylib/lib_Internal*
+          rm -f extracted_dylib/lib_Swift*
+          rm -f extracted_dylib/libclang*
+
+          # Verificar qué quedó en la carpeta
+          echo "Dylib final seleccionado:"
+          ls -la extracted_dylib/
 
       - name: Upload dylib Artifact
         uses: actions/upload-artifact@v4
